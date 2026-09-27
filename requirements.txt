@@ -1,0 +1,9 @@
+# Gradio is installed by the Space from README.md (sdk_version). Tested locally with these versions
+# (Apple MPS, float32; gradio 6.28.0, spaces 0.51.3). torch 2.13.0 is the version the live 0.8B v3 Space runs on
+# ZeroGPU; the model repo's runtime was tested with torch 2.14.0 (MPS here vs CPU 2.14.0: see LOCAL_TEST.md).
+torch==2.13.0
+transformers==5.17.0
+tokenizers==0.23.2
+numpy==2.5.3
+huggingface_hub==1.32.0
+spaces
