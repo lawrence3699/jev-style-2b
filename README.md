@@ -1,5 +1,5 @@
 ---
-title: Jev-Style 2B v3
+title: Jev-Style 2B v4
 emoji: ⚖️
 colorFrom: gray
 colorTo: blue
@@ -9,40 +9,41 @@ python_version: "3.12"
 app_file: app.py
 pinned: true
 license: apache-2.0
-short_description: 2B decisions, 25,600 tokens, no option cap
+short_description: 2B decisions on text and images, 32,768 tokens
 models:
-  - chaoliangUNSW/Jev-Style-2B-Decision-v3
-  - chaoliangUNSW/Jev-Style-2B-Decision-v3-GGUF
-  - chaoliangUNSW/Jev-Style-2B-Decision-v3-MLX
+  - chaoliangUNSW/Jev-Style-2B-Decision-v4
+  - chaoliangUNSW/Jev-Style-2B-Decision-v4-GGUF
+  - chaoliangUNSW/Jev-Style-2B-Decision-v4-MLX
 preload_from_hub:
-  - chaoliangUNSW/Jev-Style-2B-Decision-v3 LICENSE,NOTICE,chat_template.jinja,config.json,generation_config.json,jev_style_decision.py,manifest.json,model-00001-of-00002.safetensors,model-00002-of-00002.safetensors,model.safetensors.index.json,readout_config.json,release_config.json,requirements.txt,tokenizer.json,tokenizer_config.json 1b7b03951a21b363d8fbc949207d0fa195a13eff
+  - chaoliangUNSW/Jev-Style-2B-Decision-v4 LICENSE,NOTICE,SHA256SUMS.json,chat_template.jinja,config.json,generation_config.json,jev_style_decision.py,macjev_readout.json,manifest.json,model-00001-of-00003.safetensors,model-00002-of-00003.safetensors,model-00003-of-00003.safetensors,model.safetensors.index.json,preprocessor_config.json,readout_config.json,release_config.json,requirements.txt,tokenizer.json,tokenizer_config.json,video_preprocessor_config.json,src/macjev/__init__.py,src/macjev/backbone.py,src/macjev/eval/__init__.py,src/macjev/eval/aggregate.py,src/macjev/eval/di_v4.py,src/macjev/eval/metrics.py,src/macjev/eval/predictions.py,src/macjev/paths.py,src/macjev/readout.py,src/macjev/render.py,src/macjev/render_v2.py,src/macjev/runtime/__init__.py,src/macjev/runtime/cuda_graphs.py,src/macjev/runtime/fast_text.py,src/macjev/runtime/v4_engine.py,src/macjev/schema.py,src/macjev/serve/__init__.py,src/macjev/serve/schema.py,src/macjev/train/__init__.py,src/macjev/train/block_attention.py,src/macjev/train/data.py,src/macjev/train/evaluate.py,src/macjev/train/model.py,src/macjev/vision.py c9504148dae7f7a43d67a5782f12a015a4b4022c
 tags:
   - text-classification
+  - image-classification
   - llm-routing
   - guardrails
   - calibration
 ---
 
-# Jev-Style 2B v3
+# Jev-Style 2B v4
 
-Try [Jev-Style-2B-Decision-v3](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v3): give it a text or a
-JSON state and a typed question, get a calibrated probability for every option. Choice, yes/no or score; up to
-25,600 tokens of input and no cap on the number of options. Ask several questions about one text and the text is
-computed once.
+Try [Jev-Style-2B-Decision-v4](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4): give it a text or a
+JSON state, optionally with an image, and a typed question, get a calibrated probability for every option. Choice,
+yes/no or score; up to 32,768 tokens of input (image tokens included) and up to 255 options. Ask several questions
+about one state and the state is computed once.
 
-Runs the model repo's own PyTorch runtime (float32) on ZeroGPU. Other builds:
-[GGUF](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v3-GGUF) ·
-[MLX](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v3-MLX). The smaller model:
+Runs the model repo's own PyTorch runtime (float32) on ZeroGPU. Text-only builds:
+[GGUF](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4-GGUF) ·
+[MLX](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4-MLX). The smaller model:
 [Jev-Style v3 0.8B Space](https://huggingface.co/spaces/chaoliangUNSW/jev-style-v3). Website: [jevstyle.com](https://jevstyle.com).
 
-**Use it locally** (Python with `torch`, `transformers`, `tokenizers`, `numpy`; versions in the model repo's
-`requirements.txt`):
+**Use it locally** (Python with `torch`, `torchvision`, `transformers`, `tokenizers`, `numpy`, `pillow`; versions in
+the model repo's `requirements.txt`):
 
 ```python
 import sys
 from huggingface_hub import snapshot_download
 
-path = snapshot_download("chaoliangUNSW/Jev-Style-2B-Decision-v3")
+path = snapshot_download("chaoliangUNSW/Jev-Style-2B-Decision-v4")
 sys.path.insert(0, path)
 from jev_style_decision import JevStyleDecision
 
@@ -52,19 +53,25 @@ r = m.decide("I was charged twice for my subscription this month.",
              options={"billing": "payments, invoices, refunds", "technical": "bugs and outages",
                       "sales": "new purchases"})
 print(r["answer"], r["probabilities"])
+
+receipt = {"receipt": "<|image_1|>", "policy": "Meals over 50 EUR need a manager approval."}
+r = m.decide(receipt, "Does this receipt need a manager approval?", images=[path + "/assets/receipt.png"])
+print(r["answer"], r["probabilities"])
 ```
 
-`m.decide_many(text, [q1, q2, ...])` scores several questions about one text; each question is
-`{"t": "choice" | "noul" | "score", "ins": ..., "crit": ...}`. The "Use it locally" box in the app shows the code
-for whatever you ran.
+`m.decide_many(state, [q1, q2, ...])` scores several questions about one state; each question is
+`{"t": "choice" | "noul" | "score", "ins": ..., "crit": ...}`. `images=[...]` takes paths, bytes, data URLs, base64 or
+PIL images. The "Use it locally" box in the app shows the code for whatever you ran.
 
-Scope: the decision scores need the model's own runtimes (PyTorch, GGUF or MLX, shipped in the model repos); stock
-llama.cpp, Ollama, LM Studio or `mlx_lm.generate` can load the weights but cannot produce them. Inputs over 25,600
-tokens are refused, never truncated. The model was trained on a reduced data pool (60M tokens).
+Scope: the decision scores need the model's own runtimes (PyTorch here; the GGUF and MLX builds ship their own,
+text only); stock llama.cpp, Ollama, LM Studio or `mlx_lm.generate` can load the weights but cannot produce them.
+Inputs over 32,768 tokens are refused, never truncated. Images go in the state at native resolution up to 1.6 MP;
+questions and options are text.
 
-The 19K-token example is public-domain text (U.S. founding documents, Project Gutenberg eBooks 1, 5, 2 and 1404).
-Code: Apache-2.0. The model is Apache-2.0, but some of its training data has restrictive or unclear terms and some
-training rows are outputs of OpenAI GPT and Anthropic Claude models; see
-[Training data and licences](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v3#training-data-and-licences)
+The 19K-token example is public-domain text (U.S. founding documents, Project Gutenberg eBooks 1, 5, 2 and 1404); the
+receipt is made up, drawn for the model card. Code: Apache-2.0. The model is Apache-2.0. It was trained in part on
+soft labels distilled from TypeSafe Jev 1.14 via its public API; some of its training data has restrictive or unclear
+terms and some training rows are outputs of OpenAI GPT and Anthropic Claude models; see
+[Training data and licences](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4#training-data-and-licences)
 on the model card. Not affiliated with TypeSafe or Jev. AI disclosure: code written with AI coding assistants
 (Claude Code) under my direction; I designed the project, trained the models and verified the results.
