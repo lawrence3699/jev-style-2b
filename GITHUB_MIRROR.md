@@ -4,6 +4,6 @@ This repository mirrors the public Hugging Face Space at:
 
 <https://huggingface.co/spaces/chaoliangUNSW/jev-style-2b>
 
-Snapshot of Hugging Face revision `02ea88c3aa42c72fc9683d178caf5f0838e95d30`.
+Snapshot of Hugging Face revision `63101dc999bed8071aa391cf2a2a3536732a2287`.
 
 All files are stored on the `main` branch.

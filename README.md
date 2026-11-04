@@ -1,5 +1,5 @@
 ---
-title: Jev-Style 2B v4
+title: Jev-Style · Local Agent Decisions
 emoji: ⚖️
 colorFrom: gray
 colorTo: blue
@@ -9,7 +9,7 @@ python_version: "3.12"
 app_file: app.py
 pinned: true
 license: apache-2.0
-short_description: 2B decisions on text and images, 32,768 tokens
+short_description: Route tickets, review agent commands and check receipts
 models:
   - chaoliangUNSW/Jev-Style-2B-Decision-v4
   - chaoliangUNSW/Jev-Style-2B-Decision-v4-GGUF
@@ -24,54 +24,55 @@ tags:
   - calibration
 ---
 
-# Jev-Style 2B v4
+## Local JevStyle and hosted service information
 
-Try [Jev-Style-2B-Decision-v4](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4): give it a text or a
-JSON state, optionally with an image, and a typed question, get a calibrated probability for every option. Choice,
-yes/no or score; up to 32,768 tokens of input (image tokens included) and up to 255 options. Ask several questions
-about one state and the state is computed once.
+This Hugging Face demo is a remote service. To run downloaded JevStyle weights on your own hardware without a hosted API key, follow the [official local installation guide](https://jevstyle.com/guides/run-locally/). Use 0.8B for text, or 2B v4 with PyTorch for images; the MLX and GGUF builds are text-only. TypeSafe/OpenRouter credentials and agent simulation are different execution paths.
 
-Runs the model repo's own PyTorch runtime (float32) on ZeroGPU. Text-only builds:
-[GGUF](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4-GGUF) ·
-[MLX](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4-MLX). The smaller model:
-[Jev-Style v3 0.8B Space](https://huggingface.co/spaces/chaoliangUNSW/jev-style-v3). Website: [jevstyle.com](https://jevstyle.com).
+JevStyle is maintained independently by Chaoliang Yan. The **2B v4** release was trained in part on soft labels distilled from TypeSafe Jev 1.14 through its public API; this does not imply affiliation or endorsement. Training sources differ by release.
 
-**Use it locally** (Python with `torch`, `torchvision`, `transformers`, `tokenizers`, `numpy`, `pillow`; versions in
-the model repo's `requirements.txt`):
+The JevStyle hosted API is separate from this demo and local inference. Check [dated service status and live health](https://jevstyle.com/api/#service-status) for its availability and current limits. A service-health observation is not an end-to-end request test.
 
-```python
-import sys
-from huggingface_hub import snapshot_download
 
-path = snapshot_download("chaoliangUNSW/Jev-Style-2B-Decision-v4")
-sys.path.insert(0, path)
-from jev_style_decision import JevStyleDecision
+# Jev-Style 2B v4 — live decisions and saved examples
 
-m = JevStyleDecision(path)                     # float32; CUDA, Apple MPS or CPU
-r = m.decide("I was charged twice for my subscription this month.",
-             "Which team should handle this ticket?",
-             options={"billing": "payments, invoices, refunds", "technical": "bugs and outages",
-                      "sales": "new purchases"})
-print(r["answer"], r["probabilities"])
+Route a support ticket, review an agent command, or check a receipt. The model returns a probability for each allowed option. Choose a task, edit its input, and select **Run live**.
 
-receipt = {"receipt": "<|image_1|>", "policy": "Meals over 50 EUR need a manager approval."}
-r = m.decide(receipt, "Does this receipt need a manager approval?", images=[path + "/assets/receipt.png"])
-print(r["answer"], r["probabilities"])
+[Project home](https://jevstyle.com/?utm_source=huggingface&utm_medium=space&utm_campaign=demo) · [Model and evaluations](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4) · [Python package and source](https://github.com/lawrence3699/jev-style)
+
+## When a live request cannot finish
+
+Live inference uses shared Hugging Face ZeroGPU resources. Queue capacity, account quota, timeouts, invalid inputs, and other runtime failures have different causes. The interface preserves your input, describes the known cause without exposing server exceptions, and leaves two routes available:
+
+- **Saved examples:** three genuine, previously computed outputs with the exact recorded input, question, options, model revision, and cache provenance. These live in a separate labelled panel. They never replace the live output or claim to answer edited input. Expanding a saved card makes no backend or GPU request after the page has loaded.
+- **Run on your machine:** copy the platform-specific setup command. The current request's Python export is prepared before GPU inference, so a quota failure does not prevent local reproduction. Save a selected image as `image.png` next to the script.
+
+The wait indicator measures time spent waiting in the interface; it does not predict an ETA. **Stop waiting** cancels queued work and stops receiving the live result. Work already running on the GPU may finish in the background. The app does not retry automatically.
+
+A platform rejection can happen before an application callback runs. Gradio's native queue/error UI remains enabled, and the already-loaded saved cards and local setup do not depend on that callback succeeding. If model initialization fails, the page can still serve saved examples.
+
+## Local setup
+
+Use Python 3.10 or newer in a virtual environment:
+
+```bash
+python -m pip install -U "jev-style[torch]>=0.6.1"
+jev-style serve --release 2b-v4 --backend torch
 ```
 
-`m.decide_many(state, [q1, q2, ...])` scores several questions about one state; each question is
-`{"t": "choice" | "noul" | "score", "ins": ..., "crit": ...}`. `images=[...]` takes paths, bytes, data URLs, base64 or
-PIL images. The "Use it locally" box in the app shows the code for whatever you ran.
+Open `http://127.0.0.1:8765`. For Apple silicon **text-only** use `jev-style[mlx]` and `--backend mlx`. Images require PyTorch. First launch downloads the model; weight file size is not the same as RAM/VRAM usage.
 
-Scope: the decision scores need the model's own runtimes (PyTorch here; the GGUF and MLX builds ship their own,
-text only); stock llama.cpp, Ollama, LM Studio or `mlx_lm.generate` can load the weights but cannot produce them.
-Inputs over 32,768 tokens are refused, never truncated. Images go in the state at native resolution up to 1.6 MP;
-questions and options are text.
+The model reads text, JSON, and optionally an image. It supports `choice`, `noul` (yes/no), and `score`, with up to 32,768 input tokens (including image tokens), up to 255 choices, and at most 12 questions per request in this Space. Stock text-generation runtimes do not produce these decision scores.
 
-The 19K-token example is public-domain text (U.S. founding documents, Project Gutenberg eBooks 1, 5, 2 and 1404); the
-receipt is made up, drawn for the model card. Code: Apache-2.0. The model is Apache-2.0. It was trained in part on
-soft labels distilled from TypeSafe Jev 1.14 via its public API; some of its training data has restrictive or unclear
-terms and some training rows are outputs of OpenAI GPT and Anthropic Claude models; see
-[Training data and licences](https://huggingface.co/chaoliangUNSW/Jev-Style-2B-Decision-v4#training-data-and-licences)
-on the model card. Not affiliated with TypeSafe or Jev. AI disclosure: code written with AI coding assistants
-(Claude Code) under my direction; I designed the project, trained the models and verified the results.
+## Saved result provenance
+
+`saved_examples.json` contains three outputs recovered with read-only HTTP GETs from the previous Space's Gradio cache. Every entry includes the original probabilities, the exact input and question, source CSV hashes, and pinned model/Space revisions. The receipt image is checked against its recorded SHA-256 before embedding. Original cache timestamps do not encode a timezone; they are never labelled UTC. Historical timing is shown only inside recording details and is not a current request time.
+
+Sample inputs are illustrative, not a benchmark or authorization policy. The agent-command prediction is not a safety guarantee. Evaluate on representative held-out data before automating any action.
+
+The live model remains pinned to `chaoliangUNSW/Jev-Style-2B-Decision-v4@c9504148dae7f7a43d67a5782f12a015a4b4022c`, PyTorch float32. CUDA graphs remain disabled on ZeroGPU. No model weights or decision thresholds were changed for this interface update.
+
+## Developer preview
+
+With Gradio 6.28.0 installed, `JEV_DEMO_PREVIEW=1 python app.py` starts a clearly marked cache-only UI preview without downloading or loading a model. Do not set this variable on the hosted live Space. The public `decide` and `decide_many` endpoints retain their previous input shapes and three output fields; failures remain errors and are not substituted with saved outputs.
+
+The longer document example uses public-domain U.S. founding documents from Project Gutenberg. The receipt is synthetic. Code is Apache-2.0. The model was trained in part on soft labels distilled from TypeSafe Jev 1.14; this is an independent project, not affiliated with TypeSafe or Jev.
